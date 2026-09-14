@@ -13,6 +13,7 @@ class TableroAjedrez:
             ['P','P','P','P','P','P','P','P'],
             ['R','N','B','Q','K','B','N','R']
         ]
+        self.derechos_enroque = {'K': True, 'Q': True, 'k': True, 'q': True}
 
     def imprimir_consola(self):
 
@@ -45,12 +46,53 @@ class TableroAjedrez:
         
         return f"{columna_letra}{fila_numero}"
 
-    def mover_pieza(self, origen, destino):
+    def mover_pieza(self, origen, destino, promocion=None):
         fila_origen, col_origen = self.notacion_a_indices(origen)
         fila_destino, col_destino = self.notacion_a_indices(destino)
 
         pieza = self.matriz[fila_origen][col_origen]
-        self.matriz[fila_destino][col_destino] = pieza    
+        pieza_capturada = self.matriz[fila_destino][col_destino]
+        
+        es_peon = pieza.lower() == 'p'
+        llego_al_final = fila_destino == 0 or fila_destino == 7
+        
+        if es_peon and llego_al_final:
+            if not promocion:
+                promocion = input("¿Promover a (Q, R, B, N)?: ").strip().upper()
+            pieza = promocion if pieza.isupper() else promocion.lower()
+
+        if pieza == 'K':
+            self.derechos_enroque['K'] = False
+            self.derechos_enroque['Q'] = False
+        elif pieza == 'k':
+            self.derechos_enroque['k'] = False
+            self.derechos_enroque['q'] = False
+            
+        if pieza == 'R':
+            if col_origen == 0: self.derechos_enroque['Q'] = False
+            if col_origen == 7: self.derechos_enroque['K'] = False
+        elif pieza == 'r':
+            if col_origen == 0: self.derechos_enroque['q'] = False
+            if col_origen == 7: self.derechos_enroque['k'] = False
+            
+        if pieza_capturada == 'R':
+            if fila_destino == 7 and col_destino == 0: self.derechos_enroque['Q'] = False
+            if fila_destino == 7 and col_destino == 7: self.derechos_enroque['K'] = False
+        elif pieza_capturada == 'r':
+            if fila_destino == 0 and col_destino == 0: self.derechos_enroque['q'] = False
+            if fila_destino == 0 and col_destino == 7: self.derechos_enroque['k'] = False
+
+        if pieza.lower() == 'k' and abs(col_origen - col_destino) == 2:
+            if col_destino == 6:
+                torre = self.matriz[fila_origen][7]
+                self.matriz[fila_origen][5] = torre
+                self.matriz[fila_origen][7] = '.'   
+            elif col_destino == 2: 
+                torre = self.matriz[fila_origen][0]
+                self.matriz[fila_origen][3] = torre 
+                self.matriz[fila_origen][0] = '.'  
+
+        self.matriz[fila_destino][col_destino] = pieza
         self.matriz[fila_origen][col_origen] = '.'
 
     def obtener_movimientos_peon(self, fila, columna, ultimo_movimiento=None):
@@ -139,7 +181,25 @@ class TableroAjedrez:
                      es_enemiga_blanca = destino.isupper()
                      if es_blanca != es_enemiga_blanca:
                          movimientos_legales.append((f_nueva, c_nueva))
-
+        #Enroques
+        if es_blanca:
+            # Enroque corto (K)
+            if self.derechos_enroque['K'] and self.matriz[7][5] == '.' and self.matriz[7][6] == '.':
+                movimientos_legales.append((7, 6))
+                
+            # Enroque largo (Q)
+            if self.derechos_enroque['Q'] and self.matriz[7][1] == '.' and self.matriz[7][2] == '.' and self.matriz[7][3] == '.':
+                movimientos_legales.append((7, 2))
+                
+        else:
+            # Enroque corto (k)
+            if self.derechos_enroque['k'] and self.matriz[0][5] == '.' and self.matriz[0][6] == '.':
+                movimientos_legales.append((0, 6))
+                
+            # Enroque largo (q)
+            if self.derechos_enroque['q'] and self.matriz[0][1] == '.' and self.matriz[0][2] == '.' and self.matriz[0][3] == '.':
+                movimientos_legales.append((0, 2))
+                
         return movimientos_legales
     
     def _obtener_movimientos_deslizantes(self, fila, columna, direcciones):
@@ -241,22 +301,38 @@ class TableroAjedrez:
             return self.obtener_movimientos_rey(fila, columna)
             
         return []
+
+    def matriz_a_fen(self, turno ='w', enroques='KQkq', al_paso='-', medios_movs=0, movs_completos=1):
+        filas_fen = []
+
+        for fila in self.matriz:
+            vacios = 0
+            fila_str = ""
+
+            for casilla in fila:
+                if casilla == '.':
+                    vacios += 1
+                else:
+                    if vacios > 0:
+                        fila_str += str(vacios)
+                        vacios = 0
+                    fila_str += casilla
+            if vacios > 0:
+                fila_str += str(vacios)
+            
+            filas_fen.append(fila_str)
+
+        posicion_piezas = "/".join(filas_fen)
+        
+        fen_final = f"{posicion_piezas} {turno} {enroques} {al_paso} {medios_movs} {movs_completos}"
+
+        return fen_final
+
     
 if __name__ == "__main__":
     juego = TableroAjedrez()
-    juego.imprimir_consola()
-
-    juego.mover_pieza('d2','d4')
     juego.mover_pieza('e2','e4')
     juego.mover_pieza('f2','f4')
-    juego.imprimir_consola() 
-
-    juego.mover_pieza('f7','f5')
-    juego.imprimir_consola() 
-
-    movs_crud = []
-    movs_crud = juego.obtener_pseudo_movimientos(7,2)
-    movimientos_legales = []
-    movimientos_legales = juego.filtrar_movimientos_legales(7,2, movs_crud)
-    for i in movimientos_legales:
-        print(i)
+    juego.mover_pieza('g1','f3')
+    juego.imprimir_consola()
+    print(juego.matriz_a_fen())
