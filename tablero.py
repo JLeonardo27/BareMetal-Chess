@@ -96,39 +96,167 @@ class TableroAjedrez:
         
     def obtener_movimientos_caballo(self, fila, columna):
         movimientos_legales = []
-        deltas = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), 
-                  (1, -2), (1, 2), (2, -1), (2, 1)]
-    
-        es_pieza_negra = self.matriz[fila][columna].islower() 
+        pieza = self.matriz[fila][columna]
+        es_blanca = pieza.isupper()
 
-        for df, dc in deltas:
+        deltas_caballo = [
+            (-2, -1), (-2, 1), (-1, -2), (-1, 2),
+            (1, -2), (1, 2), (2, -1), (2, 1)
+            ]
+        for df, dc in deltas_caballo:
             f_nueva, c_nueva = fila + df, columna + dc
-        
-            if 0 <= f_nueva <= 7 and 0 <= c_nueva <= 7:
-                pieza_destino = self.matriz[f_nueva][c_nueva]
-            
-                if pieza_destino == '.':
+
+            if 0 <= f_nueva <=7 and 0 <= c_nueva <= 7:
+                destino = self.matriz[f_nueva][c_nueva]
+                if destino == '.':
                     movimientos_legales.append((f_nueva, c_nueva))
                 else:
-                    es_enemigo_negro = pieza_destino.islower()
-                
-                    if es_pieza_negra != es_enemigo_negro:
+                    es_enemiga_blanca = destino.isupper()
+                    if es_blanca != es_enemiga_blanca:
                         movimientos_legales.append((f_nueva, c_nueva))
-                    
+
         return movimientos_legales
+
+    def obtener_movimientos_rey(self, fila, columna):
+        movimientos_legales = []
+        pieza = self.matriz[fila][columna]
+        es_blanca = pieza.isupper()
+
+        deltas_rey = [
+            (-1, -1), (-1, 0), (-1, 1),
+            (0, -1),           (0, 1),
+            (1, -1),  (1, 0),  (1, 1)
+        ]
+        for df, dc in deltas_rey:
+             f_nueva, c_nueva = fila + df, columna + dc
+
+             if 0 <= f_nueva <= 7 and 0 <= c_nueva <= 7:
+                 destino = self.matriz[f_nueva][c_nueva]
+
+                 if destino == '.':
+                     movimientos_legales.append((f_nueva, c_nueva))
+                 else:
+                     es_enemiga_blanca = destino.isupper()
+                     if es_blanca != es_enemiga_blanca:
+                         movimientos_legales.append((f_nueva, c_nueva))
+
+        return movimientos_legales
+    
+    def _obtener_movimientos_deslizantes(self, fila, columna, direcciones):
+        movimientos_legales = []
+        pieza = self.matriz[fila][columna]
+        es_blanca = pieza.isupper()
+
+        for df, dc in direcciones:
+            f_actual = fila + df
+            c_actual = columna + dc
+
+            while 0 <= f_actual <= 7 and 0 <= c_actual <= 7:
+                destino = self.matriz[f_actual][c_actual]
+                if destino == '.':
+                    movimientos_legales.append((f_actual, c_actual))
+
+                else:
+                    es_enemiga_blanca = destino.isupper()
+                    if es_blanca != es_enemiga_blanca:
+                        movimientos_legales.append((f_actual, c_actual))
+                    break
+                
+                f_actual += df
+                c_actual += dc
+        return movimientos_legales
+
+    def obtener_movimientos_torre(self, fila, columna):
+        direcciones = [(-1, 0), (1,0), (0, -1), (0, 1)]
+        return self._obtener_movimientos_deslizantes(fila, columna, direcciones)
+
+    def obtener_movimientos_alfil(self, fila, columna):
+        direcciones = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+        return self._obtener_movimientos_deslizantes(fila, columna, direcciones)
+
+    def obtener_movimientos_reina(self, fila, columna):
+        direcciones = [
+            (-1, 0), (1, 0), (0, -1), (0, 1),
+            (-1, -1), (-1, 1), (1, -1), (1, 1)
+        ]
+        return self._obtener_movimientos_deslizantes(fila, columna, direcciones)
+
+    def esta_en_jaque(self, es_blanca):
+        rey = 'K' if es_blanca else 'k'
+        f_rey, c_rey = -1, -1
+        for f in range(8):
+            for c in range(8):
+                if self.matriz[f][c] == rey:
+                    f_rey, c_rey = f, c
+                    break
+        for f in range(8):
+            for c in range(8):
+                pieza = self.matriz[f][c]
+                if pieza != '.':
+                    es_enemiga_blanca = pieza.isupper()
+
+                    if es_blanca != es_enemiga_blanca:
+                        movs_enemigos = self.obtener_pseudo_movimientos(f,c)
+                        if (f_rey, c_rey) in movs_enemigos:
+                            return True
+        return False
+
+    def filtrar_movimientos_legales(self, f_origen, c_origen, pseudo_movimientos):
+        movimientos_seguros = []
+        pieza_movida = self.matriz[f_origen][c_origen]
+        es_blanca = pieza_movida.isupper()
+        for f_dest, c_dest in pseudo_movimientos:
+
+            pieza_capturada = self.matriz[f_dest][c_dest]
+
+            self.matriz[f_dest][c_dest] = pieza_movida
+            self.matriz[f_origen][c_origen] = '.'
+
+            if not self.esta_en_jaque(es_blanca):
+                movimientos_seguros.append((f_dest, c_dest))
+                
+            self.matriz[f_origen][c_origen] = pieza_movida
+            self.matriz[f_dest][c_dest] = pieza_capturada
+            
+        return movimientos_seguros
+
+    def obtener_pseudo_movimientos(self, fila, columna, ultimo_movimiento=None):
+        pieza = self.matriz[fila][columna]
+        if pieza == '.':
+            return []
         
+        tipo_pieza = pieza.lower()
+
+        if tipo_pieza == 'p':
+            return self.obtener_movimientos_peon(fila, columna, ultimo_movimiento)
+        elif tipo_pieza == 'n':
+            return self.obtener_movimientos_caballo(fila, columna)
+        elif tipo_pieza == 'b':
+            return self.obtener_movimientos_alfil(fila, columna)
+        elif tipo_pieza == 'r':
+            return self.obtener_movimientos_torre(fila, columna)
+        elif tipo_pieza == 'q':
+            return self.obtener_movimientos_reina(fila, columna)
+        elif tipo_pieza == 'k':
+            return self.obtener_movimientos_rey(fila, columna)
+            
+        return []
+    
 if __name__ == "__main__":
     juego = TableroAjedrez()
     juego.imprimir_consola()
 
     juego.mover_pieza('d2','d4')
     juego.mover_pieza('e2','e4')
+    juego.mover_pieza('f2','f4')
     juego.imprimir_consola() 
 
     juego.mover_pieza('f7','f5')
     juego.imprimir_consola() 
 
+    movs_crud = []
+    movs_crud = juego.obtener_pseudo_movimientos(7,2)
     movimientos_legales = []
-    movimientos_legales = juego.obtener_movimientos_peon(4,4)
+    movimientos_legales = juego.filtrar_movimientos_legales(7,2, movs_crud)
     for i in movimientos_legales:
         print(i)
