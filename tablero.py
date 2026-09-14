@@ -1,5 +1,7 @@
 #Mayusculas para las piezas blancas
 #Minusculas para las piezas negras
+from lichess_api import MotorLichess
+
 class TableroAjedrez:
     
     def __init__(self):
@@ -329,10 +331,3 @@ class TableroAjedrez:
         return fen_final
 
     
-if __name__ == "__main__":
-    juego = TableroAjedrez()
-    juego.mover_pieza('e2','e4')
-    juego.mover_pieza('f2','f4')
-    juego.mover_pieza('g1','f3')
-    juego.imprimir_consola()
-    print(juego.matriz_a_fen())
